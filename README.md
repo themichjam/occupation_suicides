@@ -1,67 +1,56 @@
-# Suicides by Occupation
+# Analysis of Suicide Rates Among Nurses and Midwives in England and Wales
+This README document outlines the data analysis performed on the suicide rates among nurses and midwives in England and Wales, using data provided by the Office for National Statistics (ONS). The primary focus of this analysis is to identify trends, compare demographics, and rank occupational subgroups to gain insights into the factors influencing suicide rates in these professions.
 
-tbd
+# Data Source
+The data was sourced from the ONS website, specifically from their ad-hoc analysis section which publishes summaries of suicides categorized by occupation. The data includes records from 2011 to 2019 and is segmented by country (England and Wales), sex, and occupational subgroups within the nursing and midwifery fields.
 
-## Project Structure
+## Files and Directories
+data/: Directory containing the raw data files downloaded from the ONS.
+1.suicidebyoccupationengland.xlsx: Suicide data for England.
+2.suicidebyoccupationwales.xlsx: Suicide data for Wales.
+scripts/: R scripts used for the analysis.
+figures/: Generated visualizations and plots.
 
-I structure all my ```R``` projects in a (hopefully) open and reproducable way. This projects structure is as follows;
+## Tools Used
+R: Used for all data manipulation, analysis, and visualization.
+R libraries: tidyverse, lubridate, janitor, readxl, ggplot2, and plotly.
 
-### Overview
+# Analysis Overview
+1. Data Cleaning and Preparation
+The raw data was cleaned and formatted to facilitate analysis. This included renaming columns, normalizing date formats, and structuring the data into a more manageable form.
 
-You can create this structure with [`dir_structure.R`](./scripts/dir_structure.R) in your own ```R``` project. 
+2. Trend Analysis
+We conducted trend analysis to observe the changes in suicide rates over the years. This involved plotting line and area charts to visualize trends across different years and to compare rates between sexes.
 
-```
-.
-└── this_project
-    ├── data
-    │   ├── raw
-    │   ├── processed
-    │   └── metadata
-    ├── docs
-    ├── figs
-    ├── imgs
-    ├── output 
-    ├── R
-    ├── rmd
-    ├── scripts
-    ├── README.md
-    ├── Rproj
-    └── .gitignore
-```
+3. Comparative Analysis
+The analysis compared suicide rates:
 
-### Project ```root```
-This is your project directory containing your ```.Rproj``` file.
+Between the two countries (England and Wales).
+Between males and females within the nursing and midwifery professions.
+4. Ranking and Aggregation
+Occupational subgroups were ranked based on the suicide rates to identify which subgroups are most at risk. Data was also aggregated to provide a broader view and to strengthen the findings.
 
-### The ```data``` folder
-The ```data``` folder is, unsurprisingly, where your data goes. I store all my data in this directory. 
+5. Interactive Visualizations
+Interactive plots were created using plotly to allow users to explore data dynamically, focusing on specific years, regions, or demographic details.
 
-The sub-directory called ```raw``` contains raw data files and only raw data files. These files should be treated as read only and should not be changed in any way. If you need to process/clean/modify your data do this in ```R``` **(not MS Excel)** as you can document (and justify) any changes made.
+# Key Visualizations
+Trend of Suicides Over Time by Sex: Line plots showing the trend of suicides among nurses and midwives from 2011 to 2019, broken down by sex.
+Comparative Analysis by Country and Sex: Bar charts and area plots comparing suicide rates between England and Wales and among sexes.
 
-Any processed data should be saved to a separate file and stored in the ```processed``` sub-directory.
+# How to Run the Analysis
+Set Up R Environment: Ensure that R is installed on your machine along with the required libraries. You can install missing libraries using install.packages("library_name").
+Clone the Repository: Download or clone this repository to your local machine.
+Run the Scripts: Open the scripts located in the scripts/ directory and run them in RStudio or a similar R environment.
+View Results: Examine the output and plots in the figures/ directory for visual insights.
 
-Information about data collection methods, details of data download and any other useful metadata should be saved in a text document in the ```metadata``` sub-directory.
+# Future Work
+Further analysis could include:
 
-### The ```docs``` folder
+Adding more granular data such as age groups, specific job roles, and mental health assessments.
+Expanding the dataset to include more years and possibly other regions.
+Conducting advanced statistical analyses such as survival analysis if time-to-event data becomes available.
 
-### The ```figs``` folder
+# Conclusion
+This analysis provides valuable insights into the suicide trends among nurses and midwives, highlighting critical areas for intervention and further research. The findings can help policymakers and healthcare administrators to formulate targeted strategies to improve mental health support for these professionals.
 
-### The ```imgs``` folder
-
-### The ```output``` folder
-Outputs from our R scripts such as plots, HTML files and data summaries are saved in this directory. This helps us and our collaborators distinguish what files are outputs and which are source files.
-
-### The ```R``` folder
-Sometimes also called ```src```. This is an optional directory where we save all of the custom R functions we’ve written for the current analysis. These can then be sourced into R using the source() function.
-
-### The ```rmd``` folder
-An optional directory where we save our R ```markdown``` documents.
-
-### The ```scripts``` folder
-All of the main R ```scripts``` we have written for the current project are saved here.
-
-### References for Open Directory Practices 
-
-1. [R Bloggers: Structuring R Projects](https://www.r-bloggers.com/2018/08/structuring-r-projects/0)
-2. [Telethon Kids:How do you Structure your R Projects? ](https://telethonkids.wordpress.com/2019/07/24/how-do-you-organise-your-r-project-this-is-what-we-do/)
-3. [Intro2R: Directory Structures](https://intro2r.com/dir-struct.html)
-4. [Nice R Code: Designing Projects](https://nicercode.github.io/blog/2013-04-05-projects/)
+For questions or further information, please contact the data analysis team or refer to the ONS website.
