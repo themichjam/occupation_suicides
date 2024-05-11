@@ -1,0 +1,350 @@
+---
+title: "Nurse suicides from ONS data on suicides by occupation up to 2019"
+author: "Michelle Jamieson"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Load packages
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)  # for tidy workflow
+library(readxl)  # for reading excel files
+library(lubridate)  # dealing with dates
+library(janitor)  # for cleaning column names
+library(patchwork)  # for assembling plots
+library(extrafont)  # for working with fonts
+library(openxlsx)  # for creating xlsx files
+library(knitr)  # for displaying tables in rmd
+library(curl)  # for downloading files
+library(glue)  # for programming strings
+```
+
+
+# Load data
+
+## Download data
+
+The ONS publishes a summary of suicides categorised by occupation, as an "ad-hoc" analysis: [ONS website](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/adhocs/10807suicidebyoccupationenglandandwales2011to2018registrations)
+
+Two spreadsheets are provided for England & Wales:
+
+* https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/adhocs/10807suicidebyoccupationenglandandwales2011to2018registrations/1.suicidebyoccupationengland.xlsx
+* https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/adhocs/10807suicidebyoccupationenglandandwales2011to2018registrations/2.suicidebyoccupationwales.xls.xlsx
+
+
+```{r}
+url_england_2019 <- "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/adhocs/10807suicidebyoccupationenglandandwales2011to2018registrations/1.suicidebyoccupationengland.xlsx"
+  
+url_wales_2019 <- "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/adhocs/10807suicidebyoccupationenglandandwales2011to2018registrations/2.suicidebyoccupationwales.xls.xlsx"
+
+if (!dir.exists("./data")) dir.create("./data")  # create data dir if doesn't exist
+
+path_england_2019 <- "./data/1.suicidebyoccupationengland.xlsx"
+path_wales_2019 <- "./data/2.suicidebyoccupationwales.xls.xlsx"
+
+curl_download(url = url_england_2019, destfile = path_england_2019)
+curl_download(url = url_wales_2019, destfile = path_wales_2019)
+```
+
+
+## Clean & import
+
+Occupation classification used is Standard Occupational Classification (SOC).
+
+Both ONS spreadsheets have several tables. Tables 1-4 use increasingly detailed classifications of occupations:
+
+1. Major group
+2. Sub-major group
+3. Minor group
+4. Unit group
+
+
+```{r}
+classification_levels <- c("major","submajor","minor","unit")  # these are used as names for the data tables
+cell_ranges <- c(  # these correspond to where in the spreadsheets the data are stored, and correspond to the classification levels above
+  "Table 1!B3:U14",
+  "Table 2!B3:U29",
+  "Table 3!B14:U105",
+  "Table 4!B14:U384"
+)
+
+data_england_2019 <- map(
+  .x = cell_ranges,
+  .f = 
+    ~read_excel(path = path_england_2019, trim_ws = TRUE, range =.x) %>%
+      set_names(x = ., nm = c(names(.)[1:2], paste0("Males_",2011:2019), paste0("Females_",2011:2019))) %>%  # rename columns to include both sex & year
+      clean_names() %>%  # lowercase names, no spaces
+      slice(-1) %>%  # remove first row, it's used to specify year
+      pivot_longer(cols = males_2011:females_2019, names_to = c("sex","year"), names_sep = "_", values_to = "n")  # convert ot tidy format
+  ) %>% 
+  set_names(x = ., nm = classification_levels)  # name each element of list according to classification level
+
+data_wales_2019 <- map(
+  .x = cell_ranges,
+  .f = 
+    ~read_excel(path = path_wales_2019, trim_ws = TRUE, range =.x) %>%
+      set_names(x = ., nm = c(names(.)[1:2], paste0("Males_",2011:2019), paste0("Females_",2011:2019))) %>%  # rename columns to include both sex & year
+      clean_names() %>%  # lowercase names, no spaces
+      slice(-1) %>%  # remove first row, it's used to specify year
+      pivot_longer(cols = males_2011:females_2019, names_to = c("sex","year"), names_sep = "_", values_to = "n")  # convert ot tidy format
+  ) %>% 
+  set_names(x = ., nm = classification_levels)  # name each element of list according to classification level
+
+## combine England & Wales in a single dataframe
+data_2019 <-
+  map2(
+  .x = data_england_2019,
+  .y = data_wales_2019,
+  .f = function(x,y) {
+    full_join(
+      x %>% rename(n_eng = n),
+      y %>% rename(n_wal = n),
+    ) %>%
+      mutate(n_engwal = n_eng + n_wal) %>%
+      pivot_longer(cols = c(n_eng, n_wal, n_engwal), names_to = "country", values_to = "n") %>%
+      mutate(country = case_when(
+        country == "n_eng" ~ "England",
+        country == "n_wal" ~ "Wales",
+        country == "n_engwal" ~ "England & Wales",
+        TRUE ~ NA_character_
+      )) %>%
+      pivot_wider(names_from = sex, values_from = n) %>%
+      mutate(all = males + females) %>%
+      pivot_longer(cols = c(males, females, all), names_to = "sex", values_to = "n") %>%
+      pivot_wider(names_from = year, values_from = n) %>%
+      mutate(all = rowSums(select(.,as.character(2011:2019)))) %>%
+      pivot_longer(cols = c("all",as.character(2011:2019)), names_to = "year", values_to = "n")
+  }
+)
+```
+
+
+# Defining nurses & midwives in data
+
+First I check through potentially relevant codes in SOC2010 across the classification levels, using keywords `nur`, `midw`, and `car`:
+
+```{r}
+soc_codes <-
+  data_2019 %>% map_df(
+    .x = .,
+    .f = ~ select(.data = .x, 1:2) %>% rename_all(.funs = ~ c("code", "description")) %>% distinct
+  )
+
+soc_codes %>%
+  filter(str_detect(description, regex("nurs|midw|car", ignore_case = TRUE))) %>%
+  print(n=nrow(.))
+```
+
+
+We define nurses as 3 digit (minor group) categories:
+
+* 223 Nursing and Midwifery Professionals
+
+Or separately in 4 digit (unit group) categories:
+
+* 2231 Nurses
+* 2232 Midwives
+* 6141 Nursing auxiliaries and assistants
+
+
+# Analysis
+
+## Number of nurses & Midwives who died by suicide
+
+```{r}
+data_2019$minor %>%
+  filter(soc_minor_group %in% c(223)) %>%
+  filter(country == "England & Wales") %>%
+  pivot_wider(names_from = year, values_from = n)
+```
+
+### Total suicides by year, country, sex
+
+```{r}
+data_2019$minor %>%
+  group_by(country, sex, year) %>%
+  summarise(n = sum(n), .groups = "drop") %>%
+  pivot_wider(names_from = year, values_from = n)
+```
+
+
+## Top 10 occupations by suicide
+
+```{r}
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "all") %>%
+  filter(year == "all") %>%
+  top_n(n = 10, wt = n) %>%
+  arrange(desc(n))
+
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "females") %>%
+  filter(year == "all") %>%
+  top_n(n = 10, wt = n) %>%
+  arrange(desc(n))
+
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "males") %>%
+  filter(year == "all") %>%
+  top_n(n = 10, wt = n) %>%
+  arrange(desc(n))
+```
+
+
+## Ranked Nurses & Midwives
+
+```{r}
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "all") %>%
+  group_by(year) %>%
+  mutate(rank = rank(-n, ties.method = "max")) %>%  # rank(-n, ties.method = "max") orders in descending order!
+  ungroup %>%
+  filter(soc_minor_group %in% c(223))
+
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "females") %>%
+  group_by(year) %>%
+  mutate(rank = rank(-n, ties.method = "max")) %>%  # rank(-n, ties.method = "max") orders in descending order!
+  ungroup %>%
+  filter(soc_minor_group %in% c(223))
+
+data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "males") %>%
+  group_by(year) %>%
+  mutate(rank = rank(-n, ties.method = "max")) %>%  # rank(-n, ties.method = "max") orders in descending order!
+  ungroup %>%
+  filter(soc_minor_group %in% c(223))
+```
+
+
+### All year rankings in 4-digit SOC
+
+```{r}
+data_2019$unit %>%
+  filter(country == "England & Wales") %>%
+  filter(year == "all") %>%
+  group_by(sex) %>%
+  mutate(rank = rank(-n, ties.method = "max")) %>%  # rank(-n, ties.method = "max") orders in descending order!
+  ungroup %>%
+  filter(str_detect(description, regex("^nurses|nursing", ignore_case = TRUE)))
+```
+
+# Visualization
+
+## Time Series Analysis
+
+```{r}
+# Ensure you are using the 'minor' data frame from your list
+data_2019$minor %>%
+  filter(soc_minor_group %in% c(223)) %>%
+  filter(country == "England & Wales") %>%
+  ggplot(aes(x = as.integer(year), y = n, group = sex, color = sex)) +
+  geom_line() +
+  labs(title = "Trend of Suicides Among Nurses and Midwives (2011-2019)",
+       x = "Year",
+       y = "Number of Suicides",
+       color = "Sex") +
+  theme_minimal()
+
+```
+
+## Regions and Gender
+
+```{r}
+# Use the 'minor' data frame from your data_2019 list
+data_2019$minor %>%
+  filter(soc_minor_group %in% c(223)) %>%  # Ensure you are focusing on nurses and midwives
+  ggplot(aes(x = country, y = n, fill = sex)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Comparison of Suicides by Region and Sex",
+       x = "Region",
+       y = "Number of Suicides",
+       fill = "Sex") +
+  theme_minimal()
+
+```
+
+# Top 10 Occupations by Suicide
+
+```{r}
+top_occupations <- data_2019$minor %>%
+  filter(country == "England & Wales") %>%
+  filter(sex == "all") %>%
+  filter(year == "all") %>%
+  top_n(n = 10, wt = n) %>%
+  arrange(desc(n))
+
+ggplot(top_occupations, aes(x = reorder(description, -n), y = n)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Top 10 Occupations by Suicide Rate",
+       x = "Occupation",
+       y = "Number of Suicides") +
+  theme_minimal()
+
+```
+
+# Ranked Nurses & Midwives by Year
+
+```{r}
+library(ggplot2)
+
+plot <- data_2019$minor %>%
+  filter(soc_minor_group %in% c(223), country == "England & Wales") %>%  # Filter to include only nurses and midwives
+  group_by(year, sex) %>%
+  summarise(n = sum(n), .groups = "drop") %>%  # Summarizing total suicides by year and sex
+  ggplot(aes(x = as.integer(year), y = n, fill = sex)) +
+  geom_area(position = 'stack', alpha = 0.6) +
+  labs(title = "Suicides Among Nurses and Midwives by Year and Sex",
+       x = "Year",
+       y = "Number of Suicides",
+       fill = "Sex") +
+  theme_minimal()
+
+print(plot)
+
+library(ggplot2)
+
+# Assuming data_2019$minor has been properly prepared with columns year, sex, and n (number of suicides)
+ggplot(data_2019$minor, aes(x = as.integer(year), y = n, color = sex)) +
+  geom_line() +
+  facet_wrap(~country) +  # Creates a separate plot for England and Wales
+  labs(title = "Trend of Suicides Among Nurses and Midwives by Sex",
+       x = "Year",
+       y = "Number of Suicides",
+       color = "Sex") +
+  theme_minimal()
+
+
+```
+
+# Save most recent workspace for further analyses
+
+```{r}
+# save.image(file = "./workspace.RData", safe = TRUE)  # this is calling .GlobalEnv, which is empty
+save(list = ls(all.names = TRUE), file = "./workspace.RData", envir = environment())
+```
+
+# Print session info
+
+```{r}
+sessionInfo()
+```
